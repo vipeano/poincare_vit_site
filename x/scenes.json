@@ -1,0 +1,76 @@
+{
+ "t_w": 1000,
+ "train_k": [
+  30,
+  200
+ ],
+ "train_tw": [
+  300,
+  2000
+ ],
+ "scenes": [
+  {
+   "id": "standard",
+   "title": "Standard map",
+   "sub": "not in the training set",
+   "topo": "pbc",
+   "family": "standard"
+  },
+  {
+   "id": "46295",
+   "title": "Oblique map on the torus",
+   "sub": "#46295 \u00b7 9 GT instances",
+   "topo": "pbc",
+   "family": "twist"
+  },
+  {
+   "id": "1089",
+   "title": "Double-kick map on the torus",
+   "sub": "#1089 \u00b7 9 GT instances",
+   "topo": "pbc",
+   "family": "golden"
+  },
+  {
+   "id": "50224",
+   "title": "Oblique map on the torus",
+   "sub": "#50224 \u00b7 12 GT instances",
+   "topo": "pbc",
+   "family": "twist"
+  },
+  {
+   "id": "13176",
+   "title": "Double-kick map on the torus, many small chains",
+   "sub": "#13176 \u00b7 21 GT instances",
+   "topo": "pbc",
+   "family": "golden"
+  },
+  {
+   "id": "4492",
+   "title": "Double-kick map on the plane",
+   "sub": "#4492 \u00b7 11 GT instances",
+   "topo": "nopbc",
+   "family": "golden"
+  },
+  {
+   "id": "63098",
+   "title": "Oblique map on the plane",
+   "sub": "#63098 \u00b7 7 GT instances",
+   "topo": "nopbc",
+   "family": "twist"
+  },
+  {
+   "id": "30301014",
+   "title": "Kerr map on the plane",
+   "sub": "#30301014 \u00b7 7 GT instances",
+   "topo": "nopbc",
+   "family": "kerr"
+  },
+  {
+   "id": "59826",
+   "title": "Oblique map on the cylinder",
+   "sub": "#59826 \u00b7 13 GT instances",
+   "topo": "cyl",
+   "family": "twist"
+  }
+ ]
+}

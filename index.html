@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poincaré Vision Transformer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+[hidden] { display: none !important; }
+/* Layout: single-column project page, 1120px measure; dark "plot ground" bands for figures in both themes; prose capped at ~68ch. Shares tokens with the playground mock-up. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --fg: #18202c;
+  --muted: #5b6678;
+  --line: #d8dee8;
+  --accent: #b5650b;
+  --accent-soft: #f7e7d2;
+  --plot: #0e1219;
+  --plot-fg: #c9d1de;
+  --bar: #c9d2df;
+  --golden: #b8860b; --twist: #2e8b57; --kerr: #8b4513;
+  --font-display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0e13; --surface: #131821; --fg: #e4e9f1; --muted: #8e99ab; --line: #252d3a;
+    --accent: #f0a53a; --accent-soft: #3a2a12; --plot: #07090d; --plot-fg: #c9d1de; --bar: #3a4456;
+    --golden: #d9a53a; --twist: #4fb07c; --kerr: #c07a45; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e13; --surface: #131821; --fg: #e4e9f1; --muted: #8e99ab; --line: #252d3a;
+  --accent: #f0a53a; --accent-soft: #3a2a12; --plot: #07090d; --plot-fg: #c9d1de; --bar: #3a4456;
+  --golden: #d9a53a; --twist: #4fb07c; --kerr: #c07a45; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--font-mono); font-size: .9em; }
+
+/* nav */
+nav.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+nav.top .wrap { display: flex; gap: 6px 18px; align-items: center; flex-wrap: wrap; padding-block: 10px; }
+nav.top .brand { font-family: var(--font-display); font-weight: 700; margin-right: auto; color: var(--fg); text-decoration: none; }
+nav.top a.l { color: var(--muted); text-decoration: none; font-size: 14px; }
+nav.top a.l:hover { color: var(--fg); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 36px; align-items: center; padding-block: 48px 40px; }
+@media (max-width: 880px) { .hero { grid-template-columns: 1fr; padding-block: 28px; } }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(36px, 5.4vw, 60px); line-height: 1.02; letter-spacing: -.02em; margin: 10px 0 12px; text-wrap: balance; }
+.sub { font-size: 19px; color: var(--muted); margin: 0 0 18px; max-width: 40ch; text-wrap: balance; }
+.author { font-size: 15px; margin: 0 0 22px; }
+.author b { font-weight: 600; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 500 14px var(--font-body); padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn[hidden] { display: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn .soon { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.btn.primary .soon { color: var(--surface); opacity: .8; }
+.btn[aria-disabled="true"] { cursor: default; opacity: .7; }
+.btn[aria-disabled="true"]:hover { border-color: var(--line); }
+
+.compare { position: relative; aspect-ratio: 1164 / 1120; max-width: min(100%, 560px); margin-inline: auto; border-radius: 10px; overflow: hidden; background: var(--plot); user-select: none; }
+.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.compare .top { clip-path: inset(0 0 0 var(--cut, 50%)); }
+.compare .rule { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); pointer-events: none; }
+.compare .knob { position: absolute; top: 50%; left: var(--cut, 50%); width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font: 600 13px var(--font-mono); pointer-events: none; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.compare input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.compare .tag { position: absolute; bottom: 8px; font: 500 11.5px var(--font-mono); color: #fff; background: rgba(0,0,0,.55); padding: 2px 7px; border-radius: 4px; pointer-events: none; }
+.compare .tag.l { left: 8px; } .compare .tag.r { right: 8px; }
+.figcap { font-size: 13.5px; color: var(--muted); margin-top: 10px; }
+
+/* sections */
+section.s { padding-block: 44px; border-top: 1px solid var(--line); scroll-margin-top: 56px; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 3vw, 32px); line-height: 1.15; margin: 6px 0 14px; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 18px; margin: 0 0 8px; }
+.prose { max-width: 68ch; }
+.prose p { margin: 0 0 14px; }
+.fig { background: #fff; border-radius: 10px; padding: 14px; border: 1px solid var(--line); margin-top: 20px; }
+.fig img { display: block; width: 100%; height: auto; }
+
+.tasks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+@media (max-width: 760px) { .tasks { grid-template-columns: 1fr; } }
+.task { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; }
+.task .q { font-family: var(--font-display); font-weight: 600; font-size: 16.5px; margin-bottom: 4px; }
+.task .k { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.task p { margin: 6px 0 0; font-size: 14.5px; color: var(--muted); }
+
+/* results */
+.results { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+@media (max-width: 900px) { .results { grid-template-columns: 1fr; } }
+.rcard { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.rcard .metric { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 3.4em; gap: 8px; align-items: center; font-size: 13.5px; padding-block: 3px; }
+.row .bar { height: 10px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.row .bar i { display: block; height: 100%; background: var(--bar); border-radius: 3px; }
+.row.best .bar i { background: var(--accent); }
+.row .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.row.best .v, .row.best .n { font-weight: 600; }
+.rnote { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 22px; font-size: 14.5px; color: var(--muted); }
+.facts b { font-family: var(--font-mono); color: var(--fg); font-weight: 500; }
+
+/* gallery */
+.gbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 18px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--muted); font: 500 13.5px var(--font-body); padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+.gbar label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; display: inline-flex; gap: 6px; align-items: center; }
+select { font: 500 13.5px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
+.ginfo { font-size: 13.5px; color: var(--muted); margin-top: 12px; max-width: 90ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); gap: 18px; margin-top: 16px; }
+
+/* gallery tiles on the main page */
+.tiles { display: grid; gap: 16px; margin-top: 22px; }
+.tile { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); color: inherit; text-decoration: none; }
+@media (max-width: 760px) { .tile { grid-template-columns: 1fr; } .tile .ttext { order: 2; } }
+.tile .ttext { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.tile .ttext .k { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.tile h3 { font-size: 20px; margin: 0; }
+.tile p { margin: 0; font-size: 14.5px; color: var(--muted); }
+.tile .go { margin-top: auto; padding-top: 6px; font-weight: 600; font-size: 14.5px; color: var(--accent); }
+.tile .tim { position: relative; background: #fff; display: grid; place-items: center; padding: 10px; }
+.tile .tim img { display: block; width: 100%; height: auto; }
+.tile .tim .ov { position: absolute; right: 12px; bottom: 12px; background: rgba(10, 14, 20, .78); color: #fff; font: 600 13px var(--font-body); padding: 6px 11px; border-radius: 7px; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; }
+.tile:hover, .tile:focus-visible { border-color: var(--accent); }
+.tile:hover .ov, .tile:focus-visible .ov { opacity: 1; transform: none; }
+.tile:hover .go { text-decoration: underline; }
+@media (hover: none) { .tile .tim .ov { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tile .tim .ov { transition: none; } }
+
+/* full gallery view */
+#gview .wrap { max-width: 1440px; }
+#gview { padding-block: 22px 40px; }
+.back { display: inline-flex; gap: 6px; align-items: center; font-weight: 500; font-size: 14.5px; color: var(--accent); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+#gview h2 { margin-top: 12px; }
+.hint { font-size: 13px; color: var(--muted); }
+.card { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; display: flex; flex-direction: column; }
+.card:hover { border-color: var(--accent); }
+.card .im { background: #fff; aspect-ratio: 3.05 / 1; }
+.card.wide .im { aspect-ratio: 4.55 / 1; }
+.card img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.card .cap { padding: 9px 12px 11px; display: grid; gap: 3px; font-size: 13px; }
+.chips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip { font: 600 11px var(--font-body); letter-spacing: .03em; padding: 1px 7px; border-radius: 99px; color: #fff; }
+.chip.golden { background: var(--golden); } .chip.twist { background: var(--twist); } .chip.kerr { background: var(--kerr); }
+.topo { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; }
+.sid { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-left: auto; }
+.score { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.score b { font-weight: 600; }
+.empty { padding: 30px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 10px; margin-top: 16px; }
+
+.lb { position: fixed; inset: 0; z-index: 20; background: rgba(5, 8, 12, .82); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.lb .box { background: var(--surface); border-radius: 12px; max-width: min(1280px, 100%); max-height: 100%; overflow: auto; display: grid; }
+.lb .box .im { background: #fff; }
+.lb img { display: block; width: 100%; height: auto; }
+.lb .meta { padding: 12px 16px 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; }
+.lb .meta .score { font-size: 13.5px; }
+.lb .nav { margin-left: auto; display: flex; gap: 8px; }
+
+/* ood */
+.oodnums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; max-width: 720px; }
+@media (max-width: 560px) { .oodnums { grid-template-columns: 1fr; } }
+.on { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--surface); }
+.on .n { font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
+.on .n small { font-size: 14px; color: var(--muted); }
+.on.best { border-color: var(--accent); }
+.on .t { font-size: 13px; color: var(--muted); }
+
+/* resources & cite */
+.res { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+.res .rc { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--surface); min-width: 0; }
+.res .rc p { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+.res .status { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+.bib { position: relative; margin-top: 14px; }
+.bib pre { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 13px/1.55 var(--font-mono); margin: 0; }
+.bib .copy { position: absolute; top: 8px; right: 8px; }
+footer { border-top: 1px solid var(--line); padding-top: 22px; font-size: 13.5px; color: var(--muted); display: grid; gap: 6px; }
+footer p { margin: 0; max-width: 90ch; }
+</style>
+</head>
+<body>
+
+<nav class="top" aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#top">Poincaré ViT</a>
+    <a class="l" href="#tasks">Tasks</a>
+    <a class="l" href="#results">Results</a>
+    <a class="l" href="explore.html">Explore</a>
+    <a class="l" href="#gallery">Gallery</a>
+    <a class="l" href="#real-systems">Real systems</a>
+    <a class="l" href="#resources">Resources</a>
+    <a class="l" href="#cite">Cite</a>
+  </div>
+</nav>
+
+<main class="wrap" id="top">
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Max Planck Institute for the Science of Light</div>
+      <h1>Poincaré Vision Transformer</h1>
+      <p class="sub">A foundation model that reads Poincaré maps: regular and chaotic regions, island chains, and their periods.</p>
+      <p class="author"><b>Vittorio Peano</b> · MPL Erlangen</p>
+      <div class="cta">
+        <a class="btn primary" href="explore.html">Explore the network live</a>
+        <span class="btn" aria-disabled="true">Paper <span class="soon">arXiv · soon</span></span>
+        <a class="btn" href="https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.NBUIL8" target="_blank" rel="noopener">Data &amp; models <span class="soon">Edmond</span></a>
+        <a class="btn" href="https://github.com/vipeano/poincare-vit" target="_blank" rel="noopener">Code <span class="soon">GitHub</span></a>
+        <a class="btn" href="#cite">BibTeX</a>
+      </div>
+    </div>
+    <figure style="margin:0">
+      <div class="compare" id="cmp">
+        <img src="fig/hh_input.jpg" alt="Poincaré section of the Hénon–Heiles system at energy 1/8, each orbit in its own colour, inaccessible region in grey">
+        <img class="top" src="fig/hh_pred.jpg" alt="Instance segmentation predicted by the network: 10 regular regions, chaotic sea in black, inaccessible region in grey">
+        <div class="rule"></div><div class="knob">⇆</div>
+        <span class="tag l">input map</span><span class="tag r">prediction</span>
+        <input type="range" id="cmpR" min="0" max="100" value="50" aria-label="Slide between input map and prediction">
+      </div>
+      <figcaption class="figcap">Hénon–Heiles system at E = 1/8, section in the (y, p<sub>y</sub>) plane; grey: energetically inaccessible region. The network never saw this system in training; it segments the map zero-shot into 10 instances. Drag to compare.</figcaption>
+    </figure>
+  </section>
+
+  <section class="s" id="abstract">
+    <div class="eyebrow">Abstract</div>
+    <div class="prose">
+      <p>Much of the progress in physics rests on a scientist's ability to extract understanding from a diagnostic plot, yet scientific visualizations remain largely outside the reach of modern vision models. We introduce the Poincaré Vision Transformer, a foundation model trained to extract physical insight from Poincaré maps. These are among the most information-dense images in physics: a single picture captures the dynamics of a Hamiltonian system across an extended region of phase space.</p>
+      <p>We recast the expert visual analysis of such maps as a set of image-to-image tasks, and introduce a physics-inspired pretraining for them: from a map built by following a set of initial conditions for a short time, the network predicts the map that the same initial conditions produce after a much longer evolution. This pretraining yields better performance on the downstream tasks than either random initialization or the state-of-the-art masked-autoencoder pretraining used for vision models. Although trained entirely on randomly generated discrete symplectic maps, the model transfers to Poincaré sections of real Hamiltonian systems, from periodically driven one-dimensional systems to two-degree-of-freedom flows such as the Hénon–Heiles system.</p>
+    </div>
+  </section>
+
+  <section class="s" id="tasks">
+    <div class="eyebrow">What the network does</div>
+    <h2>Three questions a physicist asks of a map</h2>
+    <div class="tasks">
+      <div class="task"><div class="k">Binary segmentation</div><div class="q">Regular or chaotic?</div><p>Separate the regions filled by invariant curves from the chaotic sea.</p></div>
+      <div class="task"><div class="k">Instance segmentation</div><div class="q">Which regions belong together?</div><p>Group the islands visited in turn by one orbit into a single object: the islands of one chain, or a band of circulating tori.</p></div>
+      <div class="task"><div class="k">Semantic segmentation</div><div class="q">How many islands does an orbit visit?</div><p>Label each region by its first-return period: for a chain of islands, the number of islands.</p></div>
+    </div>
+    <div class="fig"><img src="fig/overview.jpg" alt="Figure 1 of the paper: (a) the three tasks on a Hénon–Heiles section, (b) long-time map completion pretraining with a UNETR, (c) fine-tuning with a task-specific decoder" loading="lazy"></div>
+    <p class="figcap">(a) The three tasks on a Hénon–Heiles section. (b) Pretraining by long-time map completion: from a map painted with short orbits, the UNETR predicts the map the same initial conditions paint after a much longer evolution. The target needs no labels, only further iteration of the map. (c) The pretrained ViT encoder is fine-tuned with a task-specific decoder.</p>
+  </section>
+
+  <section class="s" id="results">
+    <div class="eyebrow">Results</div>
+    <h2>Map-completion pretraining beats random initialization and MAE on every task</h2>
+    <div class="prose"><p>Validation scores of the ViT-L UNETR on held-out random maps, for three choices of encoder initialization. The rare high-period classes benefit most, which is why the mIoU gain (every class weighted equally) is about three times the per-map gain.</p></div>
+    <div class="results" id="resCards"></div>
+    <div class="tiles" id="tilesPre"></div>
+    <div class="facts">
+      <span><b>0.3 s</b> per map for instance segmentation on a laptop (Apple M4 Pro)</span>
+      <span><b>87 ms</b> per forward pass; binary and semantic need nothing more</span>
+      <span><b>30</b> period classes</span>
+    </div>
+  </section>
+
+  <section class="s" id="gallery">
+    <div class="eyebrow">Gallery</div>
+    <h2>Predictions on validation maps</h2>
+    <div class="prose"><p>Predictions on held-out validation maps for each of the three segmentation tasks and for the map-completion pretraining task. Open one to browse the maps, filter them by family and topology, and sort them from best to worst.</p></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section class="s" id="real-systems">
+    <div class="eyebrow">Zero-shot deployment</div>
+    <h2>Trained on random maps, applied to real physical systems</h2>
+    <div class="prose">
+      <p>The instance network was deployed without any change of weights on four continuous-time systems from different corners of physics: a parametrically driven Duffing oscillator, the double pendulum, the Hénon–Heiles system, and the planar circular restricted three-body problem. Except for the driven oscillator, a conserved quantity confines the orbits to an accessible region whose shape the network never saw in training; in the three-body problem it is not even connected.</p>
+      <p>Without a pixel-level ground truth, each predicted instance is checked by launching test orbits inside it. Nearly all remaining errors are small or thin islands that the network misses, and no chain is split between instances.</p>
+    </div>
+    <div class="fig"><img src="fig/ood.jpg" alt="Figure 6 of the paper: inputs and zero-shot instance predictions for the Duffing oscillator, the double pendulum at three energies, Hénon–Heiles at three energies, and the restricted three-body problem" loading="lazy"></div>
+    <p class="figcap">(a) The four systems. (b) Driven Duffing oscillator. (c) Double pendulum across the libration-to-rotation threshold. (d) Hénon–Heiles across the regular-to-chaotic transition. (e) Restricted three-body problem, six windows segmented independently. Red rectangles: crops rescaled onto the 256 × 256 input; grey: inaccessible region.</p>
+  </section>
+  
+
+  <section class="s" id="resources">
+    <div class="eyebrow">Resources</div>
+    <h2>Data, models and code</h2>
+    <div class="res">
+      <div class="rc"><div class="status">Available</div><h3><a href="https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.NBUIL8" target="_blank" rel="noopener">Edmond deposit</a></h3><p>Weights of every network in the paper (pretrained encoders and all fine-tuned arms), the validation trajectory banks with ground truth, the full prediction galleries and per-map scores, and the out-of-distribution orbit data and code. DOI <a href="https://doi.org/10.17617/3.NBUIL8" target="_blank" rel="noopener">10.17617/3.NBUIL8</a>.</p></div>
+      <div class="rc"><div class="status">Coming soon</div><h3>Paper</h3><p>Preprint on arXiv, with appendices on map families, ground-truth labelling, architecture, training recipes and the evaluation protocol.</p></div>
+      <div class="rc"><div class="status">Available</div><h3><a href="https://github.com/vipeano/poincare-vit" target="_blank" rel="noopener">Code</a></h3><p><a href="https://github.com/vipeano/poincare-vit" target="_blank" rel="noopener">poincare-vit</a> on GitHub: a small Python package that segments your own map from its orbits, downloading the networks from Edmond. The Edmond deposit also holds the code behind every figure of the paper and the evaluation code.</p></div>
+      <div class="rc"><div class="status">Prototype</div><h3>Playground</h3><p>Seed orbits of the standard map in the browser and watch the segmentation follow. <a href="https://claude.ai/artifact/8hBcgUBxNmPy8URqEQJDv7" target="_blank" rel="noopener">Open the mock-up</a>.</p></div>
+    </div>
+  </section>
+
+  <section class="s" id="cite">
+    <div class="eyebrow">Cite</div>
+    <h2>BibTeX</h2>
+    <div class="bib"><pre id="bibText">@article{Peano2026PVT,
+  author  = {Peano, Vittorio},
+  title   = {{Poincar\'e Vision Transformer}, a foundational model to analyze {Poincar\'e} maps},
+  journal = {arXiv preprint arXiv:XXXX.XXXXX},
+  year    = {2026}
+}
+
+@misc{PVTData2026,
+  author       = {Peano, Vittorio},
+  title        = {{Poincar\'e Vision Transformer}: trained models, validation data and prediction galleries},
+  howpublished = {Edmond -- The Open Research Data Repository of the Max Planck Society},
+  year         = {2026},
+  doi          = {10.17617/3.NBUIL8}
+}</pre><button class="btn copy" id="bibCopy">Copy</button></div>
+  </section>
+
+  <footer>
+    <p>Max Planck Institute for the Science of Light, Staudtstr. 2, 91058 Erlangen, Germany.</p>
+    <p>Thanks to Florian Marquardt for encouragement and discussions, including suggesting map completion as a task, and to Yuki Asano for suggesting the comparison with Segment Anything. The networks were trained on the HPC system Viper at the Max Planck Computing and Data Facility.</p>
+  </footer>
+</main>
+
+<div id="gview" hidden>
+  <div class="wrap">
+    <a class="back" id="gBack" href="#gallery">← Back to the project page</a>
+    <h2 id="gTitle"></h2>
+    <p class="prose" id="gDesc" style="margin:0"></p>
+
+    <div class="gbar">
+      <div class="seg" role="group" aria-label="Task" id="gTask">
+        <button data-v="instance" aria-pressed="true">Instance</button>
+        <button data-v="semantic" aria-pressed="false">Semantic</button>
+        <button data-v="binary" aria-pressed="false">Binary</button>
+        <button data-v="completion" aria-pressed="false">Completion</button>
+        <button data-v="pretraining" aria-pressed="false">Pretraining arms</button>
+      </div>
+      <div class="seg" role="group" aria-label="Painting" id="gPaint">
+        <button data-v="dense" aria-pressed="true">Dense</button>
+        <button data-v="sparse" aria-pressed="false">Sparse</button>
+      </div>
+      <label for="gFam">Family <select id="gFam"><option value="">all</option><option value="golden">Double kick</option><option value="twist">Oblique</option><option value="kerr">Kerr</option></select></label>
+      <label for="gTopo">Topology <select id="gTopo"><option value="">all</option><option value="pbc">Torus</option><option value="cyl">Cylinder</option><option value="nopbc">Open</option></select></label>
+      <label for="gSort">Sort <select id="gSort"><option value="median" selected>closest to median</option><option value="desc">score, best first</option><option value="asc">score, worst first</option></select></label>
+    </div>
+    <p class="ginfo" id="gInfo"></p>
+    <div class="grid" id="gGrid"></div>
+    <div style="text-align:center;margin-top:20px"><button class="btn" id="gMore" hidden></button></div>
+  </div>
+</div>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Map detail">
+  <div class="box">
+    <div class="im"><img id="lbImg" alt=""></div>
+    <div class="meta"><span id="lbMeta"></span>
+      <span class="nav"><button class="btn" id="lbPrev">← Prev</button><button class="btn" id="lbNext">Next →</button><button class="btn" id="lbClose">Close</button></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+
+// ---------- hero compare ----------
+const cmp = $('cmp'), cmpR = $('cmpR');
+const setCut = v => cmp.style.setProperty('--cut', v + '%');
+cmpR.addEventListener('input', e => setCut(e.target.value)); setCut(50);
+
+// ---------- results (numbers from the paper's tables) ----------
+const RES = [
+  { t: 'Binary', metric: 'per-map IoU of the regular class', rows: [['None', 0.855], ['MAE', 0.862], ['Map completion', 0.882]], note: 'Separatrix recall: 0.841 → 0.852 → 0.897.' },
+  { t: 'Semantic', metric: 'mIoU over the 30 period classes', rows: [['None', 0.274], ['MAE', 0.365], ['Map completion', 0.447]], note: 'Per-map mIoU: 0.526 → 0.588 → 0.640.' },
+  { t: 'Instance', metric: 'panoptic quality PQ', rows: [['None', 0.468], ['MAE', 0.519], ['Map completion', 0.570]], note: 'Recognition quality RQ +17%, segmentation quality SQ +4% over no pretraining.' },
+];
+$('resCards').innerHTML = RES.map(r => {
+  const max = Math.max(...r.rows.map(x => x[1]));
+  return `<div class="rcard"><h3>${r.t}</h3><div class="metric">${r.metric}</div>` +
+    r.rows.map(([n, v]) => `<div class="row${v === max ? ' best' : ''}"><span class="n">${n}</span><span class="bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></span><span class="v">${v.toFixed(3)}</span></div>`).join('') +
+    `<div class="rnote">${r.note}</div></div>`;
+}).join('');
+
+// ---------- gallery ----------
+const TOPO = { pbc: 'Torus', cyl: 'Cylinder', nopbc: 'Open' };
+const FAM = { golden: 'Double kick', twist: 'Oblique', kerr: 'Kerr' };
+const f3 = v => v == null ? 'n/a' : v.toFixed(3);
+const TASK = {
+  instance: { two: true, score: m => m.instance[st.paint].m.pq, img: m => m.instance[st.paint].img,
+    line: m => { const x = m.instance[st.paint].m; return `PQ <b>${f3(x.pq)}</b> · RQ ${f3(x.rq)} · SQ ${f3(x.sq)} · instances GT ${x.n_gt} / pred ${x.n_pred}`; },
+    info: 'Instance colours are arbitrary; matched instances need not share a colour between ground truth and prediction. Black: chaotic sea.' },
+  semantic: { two: true, has: m => !!m.semantic, score: m => m.semantic[st.paint].m.miou, img: m => m.semantic[st.paint].img,
+    line: m => { const x = m.semantic[st.paint].m; return `per-map mIoU <b>${f3(x.miou)}</b> · classes GT ${x.n_gt} / pred ${x.n_pred}`; },
+    info: 'Colours encode the first-return period. Semantic labels exist for the torus maps only.' },
+  binary: { two: true, has: m => !!m.binary, score: m => m.binary[st.paint].m.reg_iou, img: m => m.binary[st.paint].img,
+    line: m => { const x = m.binary[st.paint].m; return `regular-class IoU <b>${f3(x.reg_iou)}</b>` + (x.sep_recall != null ? ` · separatrix recall ${f3(x.sep_recall)}` : ''); },
+    info: 'White: regular. Black: chaotic.' },
+  completion: { two: false, has: m => !!m.completion, score: m => m.completion.m.fg_iou, img: m => m.completion.img,
+    line: m => { const x = m.completion.m; return `fg-IoU <b>${f3(x.fg_iou)}</b> · MSE regular ${f3(x.reg_mse)} / chaotic ${f3(x.chaos_mse)} · ${Math.round(x.chaotic * 100)}% chaotic`; },
+    info: 'Pretraining task: short input (500 iterations), predicted long map, true long map (2501 iterations). The chaotic sea cannot be predicted orbit by orbit, so the network fills it statistically.' },
+  pretraining: { two: false, wide: true, has: m => !!m.pretraining, score: m => m.pretraining.arms.completion.PQ, img: m => m.pretraining.img,
+    line: m => { const a = m.pretraining.arms; return `PQ: none ${f3(a.scratch.PQ)} · MAE ${f3(a.mae.PQ)} · completion <b>${f3(a.completion.PQ)}</b>`; },
+    info: 'The same dense painting segmented by the three instance networks: no pretraining, MAE only, and map completion. Sorted by the map-completion PQ.' },
+};
+const st = { task: 'instance', paint: 'dense', fam: '', topo: '', sort: 'median' };
+let DATA = [], view = [], lbIdx = -1;
+
+function pressed(groupId, v) { document.querySelectorAll(`#${groupId} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); }
+function render() {
+  const T = TASK[st.task];
+  document.querySelectorAll('#gPaint button').forEach(b => { b.disabled = !T.two; });
+  let list = DATA.filter(m => (!T.has || T.has(m)) && (!st.fam || m.family === st.fam) && (!st.topo || m.topo === st.topo));
+  const sc = list.map(T.score).sort((a, b) => a - b), med = sc.length ? sc[Math.floor(sc.length / 2)] : 0;
+  if (st.sort === 'desc') list.sort((a, b) => T.score(b) - T.score(a));
+  else if (st.sort === 'asc') list.sort((a, b) => T.score(a) - T.score(b));
+  else list.sort((a, b) => Math.abs(T.score(a) - med) - Math.abs(T.score(b) - med));
+  view = list;
+  $('gInfo').innerHTML = `${list.length} map${list.length === 1 ? '' : 's'} shown` + (T.two ? ` · ${st.paint} painting (${st.paint === 'dense' ? '150 orbits of 1000 iterations' : '30 orbits of 500 iterations'})` : '') + `. ${T.info} Click a map to enlarge it. All validation maps are included; scores are per map for one fixed painting. The galleries and the networks are also in the <a href="https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.NBUIL8" target="_blank" rel="noopener">Edmond deposit</a>.`;
+  shown = 0; $('gGrid').innerHTML = '';
+  if (!list.length) { $('gGrid').innerHTML = '<div class="empty">No maps match these filters. Semantic labels exist for torus maps only.</div>'; $('gMore').hidden = true; return; }
+  more();
+}
+// cards are added a page at a time, so ~1000 maps do not all enter the DOM at once
+const PAGE = 48; let shown = 0;
+function more() {
+  const T = TASK[st.task], g = $('gGrid'), end = Math.min(view.length, shown + PAGE);
+  g.insertAdjacentHTML('beforeend', view.slice(shown, end).map((m, j) => cardHTML(T, m, shown + j)).join(''));
+  shown = end;
+  $('gMore').hidden = shown >= view.length;
+  $('gMore').textContent = `Show more (${view.length - shown} left)`;
+}
+function cardHTML(T, m, i) {
+  return `<button class="card${T.wide ? ' wide' : ''}" data-i="${i}" aria-label="Open map ${m.sid}">
+    <div class="im"><img src="${T.img(m)}" alt="Map ${m.sid}: input, ground truth and prediction" loading="lazy"></div>
+    <div class="cap"><div class="chips"><span class="chip ${m.family}">${FAM[m.family]}</span><span class="topo">${TOPO[m.topo]}</span><span class="sid">#${m.sid}</span></div>
+    <div class="score">${T.line(m)}</div></div></button>`;
+}
+$('gMore').addEventListener('click', more);
+$('gGrid').addEventListener('click', e => { const c = e.target.closest('.card'); if (c) openLb(+c.dataset.i); });
+$('gTask').addEventListener('click', e => { const b = e.target.closest('button'); if (b) location.hash = 'gallery-' + b.dataset.v; });
+$('gPaint').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return; st.paint = b.dataset.v; pressed('gPaint', st.paint); render();
+});
+
+// ---------- gallery tiles (main page) and the full-gallery view ----------
+const META = {
+  instance: { k: 'Instance segmentation', title: 'Islands, chains and bands of tori', teaser: '46295',
+    desc: 'Every regular region an orbit visits is grouped into one object. Scored by panoptic quality.' },
+  semantic: { k: 'Semantic segmentation', title: 'First-return periods', teaser: '46295',
+    desc: 'Each regular region is labelled by the number of islands its orbits visit before returning. Torus maps.' },
+  binary: { k: 'Binary segmentation', title: 'Regular or chaotic', teaser: '13425',
+    desc: 'Regular islands and bands against the chaotic sea, including the thin separatrix layers between them.' },
+  completion: { k: 'Pretraining task', title: 'Long-time map completion', teaser: '1089',
+    desc: 'From a map painted with short orbits, the network predicts the map the same orbits paint after five times longer.' },
+  pretraining: { k: 'Instance segmentation', title: 'Three pretraining choices side by side', teaser: '50224',
+    desc: 'The same input segmented by the instance networks trained without pretraining, after MAE, and after map completion.' },
+};
+function tileHTML(t) {
+  const M = META[t], m = DATA.find(x => x.sid === M.teaser), T = TASK[t], n = DATA.filter(x => !T.has || T.has(x)).length;
+  const img = t === 'instance' || t === 'semantic' || t === 'binary' ? m[t].dense.img : m[t].img;
+  return `<a class="tile" href="#gallery-${t}">
+      <div class="ttext"><span class="k">${M.k}</span><h3>${M.title}</h3><p>${M.desc}</p><span class="go">Open gallery · ${n} maps →</span></div>
+      <div class="tim"><img src="${img}" alt="${M.title}: example map ${m.sid}" loading="lazy"><span class="ov">Open gallery</span></div></a>`;
+}
+function renderTiles() {
+  $('tilesPre').innerHTML = tileHTML('pretraining');   // shown in the Results section
+  $('tiles').innerHTML = Object.keys(META).filter(t => t !== 'pretraining').map(tileHTML).join('');
+}
+
+const main = $('top'), gview = $('gview');
+function route() {
+  const h = location.hash.slice(1), m = /^gallery-(\w+)$/.exec(h);
+  if (m && TASK[m[1]] && DATA.length) {
+    if (!lb.hidden) lb.hidden = true;
+    st.task = m[1]; pressed('gTask', st.task);
+    $('gBack').href = st.task === 'pretraining' ? '#results' : '#gallery';
+    $('gTitle').textContent = META[st.task].k + ': ' + META[st.task].title.toLowerCase();
+    $('gDesc').textContent = META[st.task].desc;
+    main.hidden = true; gview.hidden = false; render(); window.scrollTo(0, 0);
+    return;
+  }
+  const wasGallery = main.hidden;
+  main.hidden = false; gview.hidden = true;
+  const el = h && document.getElementById(h);
+  if (el && wasGallery) requestAnimationFrame(() => el.scrollIntoView());
+}
+window.addEventListener('hashchange', route);
+[['gFam', 'fam'], ['gTopo', 'topo'], ['gSort', 'sort']].forEach(([id, k]) => $(id).addEventListener('change', e => { st[k] = e.target.value; render(); }));
+
+// lightbox
+const lb = $('lb');
+function openLb(i) {
+  lbIdx = (i + view.length) % view.length; const m = view[lbIdx], T = TASK[st.task];
+  $('lbImg').src = T.img(m); $('lbImg').alt = `Map ${m.sid}, enlarged`;
+  $('lbMeta').innerHTML = `<span class="chips"><span class="chip ${m.family}">${FAM[m.family]}</span><span class="topo">${TOPO[m.topo]}</span><span class="sid">#${m.sid} · ${lbIdx + 1} of ${view.length}</span></span> <span class="score">${T.line(m)}</span>`;
+  lb.hidden = false; $('lbClose').focus();
+}
+const closeLb = () => { lb.hidden = true; const c = document.querySelector(`.card[data-i="${lbIdx}"]`); if (c) c.focus(); };
+$('lbClose').addEventListener('click', closeLb);
+$('lbPrev').addEventListener('click', () => openLb(lbIdx - 1));
+$('lbNext').addEventListener('click', () => openLb(lbIdx + 1));
+lb.addEventListener('click', e => { if (e.target === lb) closeLb(); });
+document.addEventListener('keydown', e => {
+  if (lb.hidden) return;
+  if (e.key === 'Escape') closeLb(); else if (e.key === 'ArrowLeft') openLb(lbIdx - 1); else if (e.key === 'ArrowRight') openLb(lbIdx + 1);
+});
+
+fetch('gallery.json').then(r => r.json()).then(d => { DATA = d.maps; renderTiles(); route(); })
+  .catch(() => { $('tiles').innerHTML = '<div class="empty">The galleries could not be loaded. Reload the page to try again.</div>'; });
+
+// bibtex copy
+$('bibCopy').addEventListener('click', () => {
+  const txt = $('bibText').textContent, b = $('bibCopy');
+  const sel = () => { const r = document.createRange(); r.selectNodeContents($('bibText')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'Selected, press ⌘C'; };
+  try { navigator.clipboard.writeText(txt).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1600); }, sel); } catch (e) { sel(); }
+});
+})();
+</script>
+</body>
+</html>
